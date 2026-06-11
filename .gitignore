@@ -1,0 +1,87 @@
+# Maven build output
+target/
+target/**/*
+
+# Maven generated files
+dependency-reduced-pom.xml
+
+# IDE files (Eclipse)
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# OS generated files
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# Build output
+*.log
+logs/
+logs/**/*
+
+# Test output files
+test-*.log
+test-*.log
+*-error.log
+*-output.log
+
+# Vosk models (large binary files, downloaded separately)
+models/
+models/**/*
+
+# Compiled class files
+*.class
+
+# Maven release files
+release.properties
+maven-status/
+
+# IDEA
+*.ipr
+*.iws
+
+# VS Code
+.vscode/
+
+# User-specific configuration (contains paths specific to user's machine)
+apolo-config.properties
+
+# Package files
+*.zip
+*.jar
+*.war
+*.ear
+*.tar.gz
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# Eclipse workspace metadata
+.project
+.classpath
+.settings/
+
+# Build output folders
+out/
+dist/
+build/
+
+# Coverage reports
+coverage/
+*.ec
+*.exec
+
+# Dependency cache
+.m2/
+.gradle/
