@@ -46,7 +46,7 @@ public final class ApoloMain {
         this.audioCapture = new AudioCapture();
         this.speechService = new SpeechService(config);
         this.router = new CommandRouter(config);
-        this.feedback = new FeedbackService();
+        this.feedback = new FeedbackService(config);
         this.executor = new ActionExecutor(config, feedback);
         this.wakeWordDetector = new WakeWordDetector(speechService, audioCapture, config, feedback);
         this.overlay = new StatusOverlay();

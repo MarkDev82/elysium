@@ -35,7 +35,7 @@ public class MiMoClient {
 
         if (apiKey == null || apiKey.isBlank()) {
             log.error("MiMo API key is missing");
-            return new MiMoResponse("NO_KEY", null, "No tengo configurada mi llave de acceso.");
+            return new MiMoResponse("NO_KEY", null, "I don't have my access key configured.");
         }
 
         try {
@@ -47,7 +47,7 @@ public class MiMoClient {
             ObjectNode systemMsg = messages.addObject();
             systemMsg.put("role", "system");
             systemMsg.put("content", "Eres Apolo, un asistente inteligente local de Windows. El usuario te hablará en español.\n" +
-                    "Tu tarea es entender lo que pide y devolver SIEMPRE un único objeto JSON válido sin texto adicional.\n" +
+                    "Tu tarea es entender lo que pide y devolver SIEMPRE un único objeto JSON válido sin texto adicional. TUS RESPUESTAS (campo 'text') DEBEN SER SIEMPRE EN INGLÉS.\n" +
                     "Formato JSON esperado:\n" +
                     "{\n" +
                     "  \"action\": \"TIPO_DE_ACCION\",\n" +
@@ -72,7 +72,11 @@ public class MiMoClient {
                     "- MAXIMIZE_APP: maximizar ventana\n" +
                     "- TAKE_SCREENSHOT: hacer captura de pantalla\n" +
                     "- TYPE_CLIPBOARD: escribir/pegar lo que hay en el portapapeles\n" +
-                    "- SPEAK: Si el usuario te hace una pregunta, te saluda, o pide información (usa el campo 'text' con tu respuesta conversacional en español).\n\n" +
+                    "- PROCESS_CLIPBOARD: si el usuario pide interactuar, resumir, traducir o corregir su portapapeles (target = la instruccion exacta que ha pedido el usuario).\n" +
+                    "- CLEAN_SYSTEM: si el usuario pide limpiar la papelera, temporales o hacer mantenimiento del PC.\n" +
+                    "- FOCUS_MODE: si el usuario pide modo concentracion o cerrar todas las demas ventanas de la barra de tareas.\n" +
+                    "- SMART_DICTATION: si el usuario pide redactar un correo, mensaje o dictar un texto. El campo 'target' debe contener EXCLUSIVAMENTE el texto final generado que se va a inyectar al teclado (sin explicaciones).\n" +
+                    "- SPEAK: Si el usuario te hace una pregunta, te saluda, o pide información (usa el campo 'text' con tu respuesta conversacional EN INGLÉS).\n\n" +
                     "Corrige automáticamente los pequeños errores de transcripción (ej: 'abre spot y fai' -> OPEN_APP, target: spotify. 'pasa de cancion' -> MEDIA_NEXT).");
 
             ObjectNode userMsg = messages.addObject();
@@ -114,15 +118,66 @@ public class MiMoClient {
                     return new MiMoResponse(action, target, speakText);
                 } catch (Exception e) {
                     log.error("MiMo devolvió algo que no es JSON válido: {}", reply);
-                    return new MiMoResponse("UNKNOWN", null, "No he podido procesar el formato de la respuesta.");
+                    return new MiMoResponse("UNKNOWN", null, "I couldn't process the response format.");
                 }
             } else {
                 log.error("API call failed: {} - {}", response.statusCode(), response.body());
-                return new MiMoResponse("UNKNOWN", null, "Error de conexión con mis servidores Xiaomi.");
+                return new MiMoResponse("UNKNOWN", null, "Connection error with Xiaomi servers.");
             }
         } catch (Exception e) {
             log.error("Exception calling MiMo: {}", e.getMessage(), e);
-            return new MiMoResponse("UNKNOWN", null, "Hubo un fallo al intentar procesar el comando en la nube.");
+            return new MiMoResponse("UNKNOWN", null, "There was an error trying to process the command.");
+        }
+    }
+
+    public String processClipboardTask(String instruction, String clipboardContent) {
+        String url = config.getMimoApiUrl();
+        String apiKey = config.getMimoApiKey();
+
+        if (apiKey == null || apiKey.isBlank()) {
+            return "API Key not configured.";
+        }
+
+        try {
+            ObjectNode root = mapper.createObjectNode();
+            root.put("model", "mimo-v2.5");
+            
+            ArrayNode messages = root.putArray("messages");
+            
+            ObjectNode systemMsg = messages.addObject();
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "You are an AI assistant processing the user's clipboard content. " +
+                    "Follow the given instruction precisely. " +
+                    "Your entire response MUST be IN ENGLISH unless the instruction explicitly asks to translate to another language. " +
+                    "Do NOT include conversational filler like 'Here is the translation'. " +
+                    "Just output the final result.");
+
+            ObjectNode userMsg = messages.addObject();
+            userMsg.put("role", "user");
+            userMsg.put("content", "Instruction: " + instruction + "\n\nClipboard content:\n" + clipboardContent);
+
+            String requestBody = mapper.writeValueAsString(root);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofSeconds(20))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                JsonNode responseNode = mapper.readTree(response.body());
+                return responseNode.at("/choices/0/message/content").asText().trim();
+            } else {
+                log.error("API call failed: {} - {}", response.statusCode(), response.body());
+                return "There was an error processing the clipboard with Xiaomi MiMo.";
+            }
+        } catch (Exception e) {
+            log.error("Exception calling MiMo for clipboard: {}", e.getMessage(), e);
+            return "A critical error occurred while contacting the AI server.";
         }
     }
 }

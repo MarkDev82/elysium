@@ -5,6 +5,9 @@ import org.slf4j.LoggerFactory;
 
 import java.awt.*;
 import java.awt.event.KeyEvent;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -291,6 +294,53 @@ public final class WindowsActions {
         }
     }
 
+    public static String readClipboard() {
+        log.info("Reading clipboard content");
+        try {
+            return (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+        } catch (UnsupportedFlavorException | IOException e) {
+            log.error("Error reading clipboard: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public static boolean writeClipboard(String text) {
+        log.info("Writing to clipboard");
+        try {
+            StringSelection selection = new StringSelection(text);
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+            return true;
+        } catch (Exception e) {
+            log.error("Error writing clipboard: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    // --- System Maintenance ---
+
+    public static boolean cleanSystem() {
+        log.info("Cleaning system (Empty Recycle Bin & Temp Files)");
+        // Run both commands sequentially in PowerShell, ignore locked file errors and force exit 0
+        String command = "try { Clear-RecycleBin -Force -ErrorAction SilentlyContinue } catch {}; " +
+                         "try { Remove-Item -Path \"$env:TEMP\\*\" -Recurse -Force -ErrorAction SilentlyContinue } catch {}; " +
+                         "exit 0";
+        return executePowerShell(command, 60);
+    }
+
+    public static boolean enterFocusMode() {
+        log.info("Entering Focus Mode (Closing all taskbar windows except Apolo)");
+        // Get all main windows, exclude Java (Apolo), cmd, powershell, Code, and WindowsTerminal, then gracefully close them
+        String command = "$processes = Get-Process | Where-Object { " +
+                         "$_.MainWindowHandle -ne 0 " +
+                         "-and $_.ProcessName -notmatch 'java' " +
+                         "-and $_.ProcessName -notmatch 'cmd' " +
+                         "-and $_.ProcessName -notmatch 'powershell' " +
+                         "-and $_.ProcessName -notmatch 'WindowsTerminal' " +
+                         "-and $_.ProcessName -notmatch 'Code' }; " +
+                         "foreach ($p in $processes) { $p.CloseMainWindow() | Out-Null }";
+        return executePowerShell(command, 10);
+    }
+
     // --- Helper methods ---
 
     private static boolean executeCommand(String... command) {
@@ -307,15 +357,19 @@ public final class WindowsActions {
     }
 
     private static boolean executePowerShell(String command) {
+        return executePowerShell(command, 10);
+    }
+
+    private static boolean executePowerShell(String command, int timeoutSeconds) {
         try {
             ProcessBuilder pb = new ProcessBuilder(
                     "powershell", "-NoProfile", "-NonInteractive", "-Command", command
             );
             pb.redirectErrorStream(true);
             Process process = pb.start();
-            boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             if (!finished) {
-                log.warn("PowerShell timeout after 10s");
+                log.warn("PowerShell timeout after {}s", timeoutSeconds);
                 process.destroyForcibly();
                 return false;
             }
