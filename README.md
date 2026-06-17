@@ -102,4 +102,4 @@ Incorporar nuevas capacidades a Apolo requiere únicamente tres pasos:
 
 ## Licencia
 
-Este proyecto es de carácter propietario y confidencial. Queda estrictamente prohibida la copia no autorizada de este documento o su código fuente por cualquier medio.
+Este proyecto está liberado bajo la **Licencia MIT**. Eres completamente libre de utilizar, modificar, distribuir y utilizar este código tanto para fines personales como comerciales. Consulta el archivo [LICENSE](LICENSE) para más detalles.
