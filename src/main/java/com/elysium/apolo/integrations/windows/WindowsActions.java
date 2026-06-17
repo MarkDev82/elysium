@@ -208,6 +208,89 @@ public final class WindowsActions {
         }
     }
 
+    // --- Media and Volume Controls ---
+
+    public static boolean mediaPlayPause() {
+        log.info("Media: Play/Pause");
+        return executePowerShell("$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]179)");
+    }
+
+    public static boolean mediaNext() {
+        log.info("Media: Next");
+        return executePowerShell("$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]176)");
+    }
+
+    public static boolean mediaPrev() {
+        log.info("Media: Previous");
+        return executePowerShell("$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]177)");
+    }
+
+    public static boolean volumeUp() {
+        log.info("Volume: Up");
+        return executePowerShell("$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]175)");
+    }
+
+    public static boolean volumeDown() {
+        log.info("Volume: Down");
+        return executePowerShell("$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]174)");
+    }
+
+    public static boolean volumeMute() {
+        log.info("Volume: Mute");
+        return executePowerShell("$wshell = New-Object -ComObject WScript.Shell; $wshell.SendKeys([char]173)");
+    }
+
+    // --- Window Management ---
+
+    public static boolean snapLeft() {
+        log.info("Snapping window left");
+        return simulateWinKey(KeyEvent.VK_LEFT);
+    }
+
+    public static boolean snapRight() {
+        log.info("Snapping window right");
+        return simulateWinKey(KeyEvent.VK_RIGHT);
+    }
+
+    public static boolean maximizeApp() {
+        log.info("Maximizing window");
+        return simulateWinKey(KeyEvent.VK_UP);
+    }
+
+    public static boolean takeScreenshot() {
+        log.info("Taking screenshot (Win+Shift+S)");
+        try {
+            Robot robot = new Robot();
+            robot.setAutoDelay(50);
+            robot.keyPress(KeyEvent.VK_WINDOWS);
+            robot.keyPress(KeyEvent.VK_SHIFT);
+            robot.keyPress(KeyEvent.VK_S);
+            robot.keyRelease(KeyEvent.VK_S);
+            robot.keyRelease(KeyEvent.VK_SHIFT);
+            robot.keyRelease(KeyEvent.VK_WINDOWS);
+            return true;
+        } catch (AWTException e) {
+            log.error("Error taking screenshot: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public static boolean typeClipboard() {
+        log.info("Typing clipboard content (Ctrl+V)");
+        try {
+            Robot robot = new Robot();
+            robot.setAutoDelay(50);
+            robot.keyPress(KeyEvent.VK_CONTROL);
+            robot.keyPress(KeyEvent.VK_V);
+            robot.keyRelease(KeyEvent.VK_V);
+            robot.keyRelease(KeyEvent.VK_CONTROL);
+            return true;
+        } catch (AWTException e) {
+            log.error("Error typing clipboard: {}", e.getMessage());
+            return false;
+        }
+    }
+
     // --- Helper methods ---
 
     private static boolean executeCommand(String... command) {

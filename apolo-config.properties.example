@@ -1,0 +1,25 @@
+# ============================================
+# Elysium Apolo Configuration (EXAMPLE)
+# ============================================
+
+# Vosk Speech Recognition
+# ============================================
+vosk.model.path=models/vosk-model-small-es-0.42
+
+# Xiaomi MiMo API Integration
+# ============================================
+mimo.api.key=tp-YOUR_API_KEY_HERE
+mimo.api.url=https://token-plan-ams.xiaomimimo.com/v1/chat/completions
+mimo.tts.url=https://token-plan-ams.xiaomimimo.com/v1/audio/speech
+
+# Wake Word
+# ============================================
+wakeword.word=apolo
+wakeword.cooldown.ms=2000
+
+# App Execution Overrides (Optional)
+# ============================================
+# Map application names spoken to the AI to their executable paths.
+# Examples:
+# app.spotify=C:\\Users\\Username\\AppData\\Roaming\\Spotify\\Spotify.exe
+# app.browser=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe

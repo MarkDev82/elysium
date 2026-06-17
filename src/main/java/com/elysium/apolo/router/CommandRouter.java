@@ -6,9 +6,10 @@ import com.elysium.apolo.config.ApoloConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.elysium.apolo.integrations.mimo.MiMoClient;
+import com.elysium.apolo.integrations.mimo.MiMoResponse;
+
 import java.text.Normalizer;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Command router: normalizes recognized text and maps it to a Command.
@@ -25,9 +26,11 @@ public final class CommandRouter {
     private static final Logger log = LoggerFactory.getLogger(CommandRouter.class);
 
     private final ApoloConfig config;
+    private final MiMoClient mimoClient;
 
     public CommandRouter(ApoloConfig config) {
         this.config = config;
+        this.mimoClient = new MiMoClient(config);
     }
 
     /**
@@ -47,24 +50,32 @@ public final class CommandRouter {
             return Command.unknown(rawText);
         }
 
-        // 1. Try system commands (ordered by specificity)
-        Command systemCommand = matchSystemCommand(normalized, rawText);
-        if (systemCommand != null) {
-            long elapsed = System.currentTimeMillis() - start;
-            log.info("Router: system match in {}ms -> {}", elapsed, systemCommand.type());
-            return systemCommand;
-        }
-
-        // 2. Try "open X" command
-        Command openCommand = matchOpenCommand(normalized, rawText);
-        if (openCommand != null) {
-            long elapsed = System.currentTimeMillis() - start;
-            log.info("Router: open match in {}ms -> app='{}'", elapsed, openCommand.argument());
-            return openCommand;
+        // Use MiMo for everything
+        MiMoResponse response = mimoClient.processText(normalized);
+        
+        if (response.action() != null) {
+            try {
+                CommandType type = CommandType.valueOf(response.action());
+                if (type == CommandType.SPEAK) {
+                    return Command.speak(response.text(), rawText);
+                } else if (response.target() != null && !response.target().isEmpty()) {
+                    if (type == CommandType.OPEN_APP) {
+                        return Command.openApp(response.target(), rawText);
+                    }
+                    return Command.system(type, response.target(), rawText);
+                } else {
+                    return Command.system(type, rawText);
+                }
+            } catch (IllegalArgumentException e) {
+                log.error("MiMo devolvió un tipo de acción desconocido: {}", response.action());
+                return Command.speak("Lo siento, la nube me devolvió una orden que no comprendo.", rawText);
+            }
+        } else if (response.text() != null && !response.text().isEmpty()) {
+            return Command.speak(response.text(), rawText);
         }
 
         long elapsed = System.currentTimeMillis() - start;
-        log.info("Router: command not recognized in {}ms: '{}'", elapsed, rawText);
+        log.info("Router: processed by MiMo in {}ms", elapsed);
         return Command.unknown(rawText);
     }
 
@@ -100,154 +111,5 @@ public final class CommandRouter {
         return result;
     }
 
-    /**
-     * Attempts to match system commands.
-     * Variations are tested in descending length order (most specific first).
-     * Requires exact match or variation as prefix followed by space.
-     */
-    private Command matchSystemCommand(String normalized, String rawText) {
-        Map<String, List<String>> aliases = config.getCommandAliases();
-
-        CommandType[] systemTypes = {
-                CommandType.MINIMIZE,
-                CommandType.LOCK,
-                CommandType.TURN_OFF_SCREEN,
-                CommandType.CLOSE_APP,
-                CommandType.CODE_MODE,
-                CommandType.RESTART_APP
-        };
-
-        String[] canonicalKeys = {"minimize", "lock", "turn off the screen", "close", "code", "restart"};
-
-        for (int i = 0; i < systemTypes.length; i++) {
-            List<String> variations = aliases.get(canonicalKeys[i]);
-            if (variations == null) continue;
-
-            // Test each variation (already ordered by specificity in config)
-            for (String variation : variations) {
-                String normalizedVariation = normalize(variation);
-
-                // Exact match
-                if (normalized.equals(normalizedVariation)) {
-                    log.debug("Exact match: '{}' == '{}'", normalized, normalizedVariation);
-                    // For restart command, extract app name even on exact match
-                    if (systemTypes[i] == CommandType.RESTART_APP) {
-                        // Remove the base "restart" word to get the app name
-                        String appName = normalized.replaceFirst("^restart\\s+", "").trim();
-                        appName = removeArticles(appName);
-                        log.debug("Restart exact match: app='{}'", appName);
-                        return Command.system(systemTypes[i], appName, rawText);
-                    }
-                    return Command.system(systemTypes[i], rawText);
-                }
-
-                // Match as prefix followed by space (not arbitrary substring)
-                if (normalized.startsWith(normalizedVariation + " ")) {
-                    log.debug("Prefix match: '{}' starts with '{} '", normalized, normalizedVariation);
-                    // For restart command, extract the app name
-                    if (systemTypes[i] == CommandType.RESTART_APP) {
-                        String appName = normalized.substring(normalizedVariation.length()).trim();
-                        appName = removeArticles(appName);
-                        log.debug("Restart match: app='{}'", appName);
-                        return Command.system(systemTypes[i], appName, rawText);
-                    }
-                    return Command.system(systemTypes[i], rawText);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Attempts to match "open X" command.
-     */
-    private Command matchOpenCommand(String normalized, String rawText) {
-        List<String> openAliases = config.getCommandAliases().get("open");
-        if (openAliases == null) return null;
-
-        for (String alias : openAliases) {
-            String normalizedAlias = normalize(alias);
-
-            // Match: "open spotify" or "open the spotify"
-            if (normalized.startsWith(normalizedAlias + " ") || normalized.equals(normalizedAlias)) {
-                // Extract app name
-                String appName;
-                if (normalized.equals(normalizedAlias)) {
-                    appName = "";
-                } else {
-                    appName = normalized.substring(normalizedAlias.length()).trim();
-                }
-
-                // Remove articles
-                appName = removeArticles(appName);
-
-                if (!appName.isEmpty()) {
-                    // Verify app exists in mappings
-                    String resolvedApp = resolveAppName(appName);
-                    if (resolvedApp != null) {
-                        log.debug("Open match: '{}' -> resolved app='{}'", normalized, resolvedApp);
-                        return Command.openApp(resolvedApp, rawText);
-                    } else {
-                        // App not found in mappings but command recognized
-                        log.info("'open' command recognized but app not mapped: '{}'", appName);
-                        return Command.openApp(appName, rawText);
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Removes common articles from app name.
-     */
-    private String removeArticles(String text) {
-        return text
-                .replaceAll("^the ", "")
-                .replaceAll("^a ", "")
-                .replaceAll("^an ", "")
-                .trim();
-    }
-
-    /**
-     * Resolves app name against configured mappings.
-     * Returns the mapping key if found, null otherwise.
-     *
-     * Strategy:
-     * 1. Exact match
-     * 2. Containment match (key contains name or vice versa)
-     * 3. Phonetic simple match (no spaces or accents)
-     */
-    private String resolveAppName(String appName) {
-        Map<String, String> mappings = config.getAppMappings();
-
-        // 1. Exact match
-        if (mappings.containsKey(appName)) {
-            return appName;
-        }
-
-        // 2. Containment match
-        for (String key : mappings.keySet()) {
-            if (key.contains(appName) || appName.contains(key)) {
-                log.debug("Partial app match: '{}' contains/in '{}'", appName, key);
-                return key;
-            }
-        }
-
-        // 3. Normalized match (no spaces)
-        String normalizedInput = appName.replaceAll("\\s+", "");
-        for (String key : mappings.keySet()) {
-            String normalizedKey = key.replaceAll("\\s+", "");
-            if (normalizedKey.equals(normalizedInput) ||
-                    normalizedKey.contains(normalizedInput) ||
-                    normalizedInput.contains(normalizedKey)) {
-                log.debug("Normalized app match: '{}' -> '{}'", appName, key);
-                return key;
-            }
-        }
-
-        return null;
-    }
+    // deterministic matching methods removed as they are now handled by MiMo
 }

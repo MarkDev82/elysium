@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
  * Uses PowerShell + Windows TTS (System.Speech.Synthesis) for voice output.
  * Does not block the main thread.
  *
- * Improvement: selects male English voice (Microsoft David) when available.
+ * Improvement: selects a Spanish voice when available.
  */
 public final class FeedbackService {
 
@@ -46,19 +46,18 @@ public final class FeedbackService {
     /**
      * Speaks synchronously using Windows Speech Synthesis via PowerShell.
      * Uses a timeout to avoid infinite blocks.
-     * Selects male English voice (Microsoft David) when available.
+     * Selects a Spanish voice when available.
      */
     private void speakSync(String text) {
         long start = System.currentTimeMillis();
         try {
             String escaped = text.replace("'", "''");
-            // PowerShell script to select male English voice
             String psCommand = String.format(
                     "Add-Type -AssemblyName System.Speech; " +
                     "$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; " +
                     "$voices = $synth.GetInstalledVoices() | Where-Object { $_.Enabled }; " +
-                    "$maleVoice = $voices | Where-Object { $_.VoiceInfo.Gender -eq 'Male' -and $_.VoiceInfo.Culture.Name -like 'en-*' } | Select-Object -First 1; " +
-                    "if ($maleVoice) { $synth.SelectVoice($maleVoice.VoiceInfo.Name) }; " +
+                    "$esVoice = $voices | Where-Object { $_.VoiceInfo.Culture.Name -like 'es-*' } | Select-Object -First 1; " +
+                    "if ($esVoice) { $synth.SelectVoice($esVoice.VoiceInfo.Name) }; " +
                     "$synth.Rate = 1; " +
                     "$synth.Speak('%s')",
                     escaped

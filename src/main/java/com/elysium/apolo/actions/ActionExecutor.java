@@ -33,7 +33,7 @@ public final class ActionExecutor {
         long start = System.currentTimeMillis();
 
         if (!command.isKnown()) {
-            feedback.speak("I did not understand the command.");
+            feedback.speak("No he entendido el comando.");
             log.info("ActionExecutor: unknown command '{}' in {}ms",
                     command.rawText(), System.currentTimeMillis() - start);
             return false;
@@ -47,10 +47,24 @@ public final class ActionExecutor {
             case LOCK -> executeLock();
             case TURN_OFF_SCREEN -> executeTurnOffScreen();
             case CLOSE_APP -> executeCloseApp();
-            case CODE_MODE -> executeCodeMode();
+            case MEDIA_PLAY_PAUSE -> executeMediaPlayPause();
+            case MEDIA_NEXT -> executeMediaNext();
+            case MEDIA_PREV -> executeMediaPrev();
+            case VOLUME_UP -> executeVolumeUp();
+            case VOLUME_DOWN -> executeVolumeDown();
+            case VOLUME_MUTE -> executeVolumeMute();
+            case SNAP_LEFT -> executeSnapLeft();
+            case SNAP_RIGHT -> executeSnapRight();
+            case MAXIMIZE_APP -> executeMaximizeApp();
+            case TAKE_SCREENSHOT -> executeTakeScreenshot();
+            case TYPE_CLIPBOARD -> executeTypeClipboard();
             case RESTART_APP -> executeRestartApp(command.argument());
+            case SPEAK -> {
+                feedback.speak(command.text() != null ? command.text() : "Procesado.");
+                yield true;
+            }
             case UNKNOWN -> {
-                feedback.speak("I did not understand the command.");
+                feedback.speak("No he entendido el comando.");
                 yield false;
             }
         };
@@ -70,34 +84,34 @@ public final class ActionExecutor {
             log.debug("App '{}' resolved to: {}", appName, target);
         }
 
-        feedback.speak("Opening " + appName + ".");
+        feedback.speak("Abriendo " + appName + ".");
         boolean result = WindowsActions.openApplication(target);
 
         if (!result) {
             log.error("Could not open '{}'", appName);
-            feedback.speak("Could not open " + appName + ".");
+            feedback.speak("No he podido abrir " + appName + ".");
         }
 
         return result;
     }
 
     private boolean executeMinimize() {
-        feedback.speak("Showing desktop.");
+        feedback.speak("Mostrando escritorio.");
         return WindowsActions.showDesktop();
     }
 
     private boolean executeLock() {
-        feedback.speak("Locking the computer.");
+        feedback.speak("Bloqueando el equipo.");
         return WindowsActions.lockWorkstation();
     }
 
     private boolean executeTurnOffScreen() {
-        feedback.speak("Turning off the screen.");
+        feedback.speak("Apagando la pantalla.");
         return WindowsActions.turnOffMonitor();
     }
 
     private boolean executeCloseApp() {
-        feedback.speak("Closing the window.");
+        feedback.speak("Cerrando la ventana.");
         return WindowsActions.closeForegroundApp();
     }
 
@@ -105,11 +119,11 @@ public final class ActionExecutor {
         // Currently only supports Spotify, but can be extended
         if (!"spotify".equalsIgnoreCase(appName)) {
             log.warn("Restart app only supports 'spotify' for now, got: {}", appName);
-            feedback.speak("I can only restart Spotify for now.");
+            feedback.speak("Solo puedo reiniciar Spotify por ahora.");
             return false;
         }
 
-        feedback.speak("Restarting Spotify.");
+        feedback.speak("Reiniciando Spotify.");
         log.info("Restarting Spotify: killing process and restarting");
 
         // 1. Kill Spotify process
@@ -135,96 +149,70 @@ public final class ActionExecutor {
 
         boolean reopened = WindowsActions.openApplication(spotifyPath);
         if (reopened) {
-            feedback.speak("Spotify restarted.");
+            feedback.speak("Spotify reiniciado.");
         } else {
-            feedback.speak("Failed to reopen Spotify.");
+            feedback.speak("No he podido reabrir Spotify.");
         }
 
         return reopened;
     }
 
-    private boolean executeCodeMode() {
-        feedback.speak("Setting up code mode.");
-        log.info("Executing code mode - opening development workspace");
-        
-        boolean allSuccess = true;
-        
-        // 1. Minimize and show desktop
-        log.info("Code mode: showing desktop");
-        WindowsActions.showDesktop();
-        
-        // 2. Open Antigravity IDE
-        String antigravityPath = config.getAppMappings().get("antigravity");
-        if (antigravityPath != null) {
-            log.info("Code mode: opening Antigravity IDE");
-            if (!WindowsActions.openApplication(antigravityPath)) {
-                log.warn("Code mode: failed to open Antigravity IDE");
-                allSuccess = false;
-            }
-        } else {
-            log.warn("Code mode: Antigravity IDE not found in mappings");
-            allSuccess = false;
-        }
-        
-        // 3. Open OpenCode
-        String opencodePath = config.getAppMappings().get("opencode");
-        if (opencodePath != null) {
-            log.info("Code mode: opening OpenCode");
-            if (!WindowsActions.openApplication(opencodePath)) {
-                log.warn("Code mode: failed to open OpenCode");
-                allSuccess = false;
-            }
-        } else {
-            log.warn("Code mode: OpenCode not found in mappings");
-            allSuccess = false;
-        }
-        
-        // 4. Open Gemini in browser (instead of Antigravity Chat)
-        String browserPath = config.getAppMappings().get("browser");
-        if (browserPath == null) {
-            browserPath = config.getAppMappings().get("chrome");
-        }
-        if (browserPath != null) {
-            log.info("Code mode: opening Gemini in browser");
-            String geminiUrl = "https://gemini.google.com";
-            if (!WindowsActions.openApplication(browserPath + " " + geminiUrl)) {
-                log.warn("Code mode: failed to open Gemini in browser");
-                allSuccess = false;
-            }
-        } else {
-            log.warn("Code mode: browser not found in mappings");
-            allSuccess = false;
-        }
-        
-        // 5. Open Spotify
-        String spotifyPath = config.getAppMappings().get("spotify");
-        if (spotifyPath != null) {
-            log.info("Code mode: opening Spotify");
-            if (!WindowsActions.openApplication(spotifyPath)) {
-                log.warn("Code mode: failed to open Spotify");
-                allSuccess = false;
-            }
-        } else {
-            log.warn("Code mode: Spotify not found in mappings");
-            allSuccess = false;
-        }
-        
-        // 6. Open File Explorer in Desktop/DEV
-        String workspacePath = config.getAppMappings().get("code workspace");
-        if (workspacePath != null) {
-            log.info("Code mode: opening File Explorer in {}", workspacePath);
-            if (!WindowsActions.openApplication("explorer.exe " + workspacePath)) {
-                log.warn("Code mode: failed to open File Explorer in workspace");
-                allSuccess = false;
-            }
-        } else {
-            log.warn("Code mode: workspace path not found in mappings");
-            allSuccess = false;
-        }
-        
-        // Always say "Code mode ready" regardless of partial failures
-        feedback.speak("Code mode ready.");
-        
-        return allSuccess;
+    // --- Media and Volume ---
+
+    private boolean executeMediaPlayPause() {
+        feedback.speak("Reproduciendo/Pausando.");
+        return WindowsActions.mediaPlayPause();
+    }
+
+    private boolean executeMediaNext() {
+        feedback.speak("Siguiente pista.");
+        return WindowsActions.mediaNext();
+    }
+
+    private boolean executeMediaPrev() {
+        feedback.speak("Pista anterior.");
+        return WindowsActions.mediaPrev();
+    }
+
+    private boolean executeVolumeUp() {
+        feedback.speak("Subiendo volumen.");
+        return WindowsActions.volumeUp();
+    }
+
+    private boolean executeVolumeDown() {
+        feedback.speak("Bajando volumen.");
+        return WindowsActions.volumeDown();
+    }
+
+    private boolean executeVolumeMute() {
+        feedback.speak("Silenciando sistema.");
+        return WindowsActions.volumeMute();
+    }
+
+    // --- Window Management and Productivity ---
+
+    private boolean executeSnapLeft() {
+        feedback.speak("Ajustando a la izquierda.");
+        return WindowsActions.snapLeft();
+    }
+
+    private boolean executeSnapRight() {
+        feedback.speak("Ajustando a la derecha.");
+        return WindowsActions.snapRight();
+    }
+
+    private boolean executeMaximizeApp() {
+        feedback.speak("Maximizando ventana.");
+        return WindowsActions.maximizeApp();
+    }
+
+    private boolean executeTakeScreenshot() {
+        feedback.speak("Abriendo herramienta de recortes.");
+        return WindowsActions.takeScreenshot();
+    }
+
+    private boolean executeTypeClipboard() {
+        feedback.speak("Pegando portapapeles.");
+        return WindowsActions.typeClipboard();
     }
 }

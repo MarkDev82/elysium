@@ -59,8 +59,8 @@ public final class ApoloMain {
         long bootStart = System.currentTimeMillis();
 
         log.info("========================================");
-        log.info("  ELYSIUM - Apolo V1");
-        log.info("  Voice automation assistant");
+        log.info("  ELYSIUM - Apolo V1 (MiMo Inteligente)");
+        log.info("  Asistente de automatización por voz local");
         log.info("========================================");
 
         try {
@@ -69,26 +69,26 @@ public final class ApoloMain {
             overlay.connectTo(feedback);
 
             // 2. Initialize Vosk model
-            log.info("[BOOT] Loading voice model...");
+            log.info("[BOOT] Cargando modelo de voz...");
             long modelStart = System.currentTimeMillis();
             speechService.initialize();
-            log.info("[BOOT] Model loaded in {}ms", System.currentTimeMillis() - modelStart);
+            log.info("[BOOT] Modelo cargado en {}ms", System.currentTimeMillis() - modelStart);
 
             // 3. Start audio capture
-            log.info("[BOOT] Initializing microphone...");
+            log.info("[BOOT] Inicializando micrófono...");
             long audioStart = System.currentTimeMillis();
             audioCapture.start();
-            log.info("[BOOT] Microphone ready in {}ms", System.currentTimeMillis() - audioStart);
+            log.info("[BOOT] Micrófono listo en {}ms", System.currentTimeMillis() - audioStart);
 
             // 4. Start wake word detector
             running = true;
             wakeWordDetector.start(this::onWakeWordDetected);
 
             long bootTime = System.currentTimeMillis() - bootStart;
-            log.info("[BOOT] Apolo ready in {}ms total", bootTime);
-            log.info("Say '{}' to activate.", config.getWakeWord());
+            log.info("[BOOT] Apolo listo en {}ms", bootTime);
+            log.info("Di '{}' para activar.", config.getWakeWord());
 
-            feedback.speak("Apolo ready.");
+            feedback.speak("Apolo listo.");
 
             // Shutdown hook
             Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "apolo-shutdown"));
@@ -102,7 +102,7 @@ public final class ApoloMain {
             log.error("Fatal error initializing Apolo: {}", e.getMessage(), e);
             System.err.println("\n=== ERROR ===");
             System.err.println(e.getMessage());
-            System.err.println("\nMake sure you have downloaded the English Vosk model.");
+            System.err.println("\nMake sure you have downloaded the Vosk model.");
             System.exit(1);
         } catch (LineUnavailableException e) {
             log.error("Could not access microphone: {}", e.getMessage(), e);
@@ -135,7 +135,7 @@ public final class ApoloMain {
 
         if (recognizedText == null || recognizedText.isBlank()) {
             log.info("No command received. Returning to idle.");
-            feedback.speak("I did not hear you.");
+            feedback.speak("No te he escuchado.");
             feedback.setState(ApoloState.IDLE);
             return;
         }
@@ -203,7 +203,7 @@ public final class ApoloMain {
                     totalCommandToActionMs / totalCommands);
         }
 
-        feedback.speak("Apolo deactivated.");
+        feedback.speak("Apolo desactivado.");
         feedback.shutdown();
         speechService.close();
         overlay.dispose();

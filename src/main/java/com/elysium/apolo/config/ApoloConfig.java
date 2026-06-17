@@ -32,9 +32,18 @@ public final class ApoloConfig {
     private final String modelPath;
     private final int commandWindowMillis;
     private final int wakeWordCooldownMillis;
+    
+    private String mimoApiKey;
+    private String mimoApiUrl;
+    private String mimoTtsUrl;
 
     public ApoloConfig() {
-        this.appMappings = loadAppMappings();
+        Properties extProps = loadExternalProperties();
+        this.mimoApiKey = extProps.getProperty("mimo.api.key", "");
+        this.mimoApiUrl = extProps.getProperty("mimo.api.url", "https://token-plan-ams.xiaomimimo.com/v1/chat/completions");
+        this.mimoTtsUrl = extProps.getProperty("mimo.tts.url", "https://token-plan-ams.xiaomimimo.com/v1/audio/speech");
+
+        this.appMappings = loadAppMappings(extProps);
         this.commandAliases = loadCommandAliases();
         this.modelPath = resolveModelPath();
         this.commandWindowMillis = 5000;
@@ -45,7 +54,7 @@ public final class ApoloConfig {
      * Maps application names to paths or execution commands.
      * Paths are resolved hierarchically.
      */
-    private Map<String, String> loadAppMappings() {
+    private Map<String, String> loadAppMappings(Properties extProps) {
         Map<String, String> map = new LinkedHashMap<>();
 
         // Default paths: try to resolve in order
@@ -152,7 +161,7 @@ public final class ApoloConfig {
         map.put("code workspace", env("USERPROFILE") + "\\Desktop\\DEV");
 
         // Load overrides from external file (they have priority)
-        loadExternalMappings(map);
+        loadExternalMappings(map, extProps);
 
         log.info("App mappings loaded: {} entries", map.size());
         for (var entry : map.entrySet()) {
@@ -252,25 +261,29 @@ public final class ApoloConfig {
         return value != null ? value : "";
     }
 
-    private void loadExternalMappings(Map<String, String> map) {
+    private Properties loadExternalProperties() {
+        Properties props = new Properties();
         Path configFile = Path.of("apolo-config.properties");
         if (Files.exists(configFile)) {
             try (InputStream is = Files.newInputStream(configFile)) {
-                Properties props = new Properties();
                 props.load(is);
-                int overrides = 0;
-                for (String key : props.stringPropertyNames()) {
-                    if (key.startsWith("app.")) {
-                        String appName = key.substring(4).toLowerCase();
-                        map.put(appName, props.getProperty(key));
-                        overrides++;
-                    }
-                }
-                log.info("Loaded {} overrides from apolo-config.properties", overrides);
             } catch (IOException e) {
                 log.warn("Error reading apolo-config.properties: {}", e.getMessage());
             }
         }
+        return props;
+    }
+
+    private void loadExternalMappings(Map<String, String> map, Properties props) {
+        int overrides = 0;
+        for (String key : props.stringPropertyNames()) {
+            if (key.startsWith("app.")) {
+                String appName = key.substring(4).toLowerCase();
+                map.put(appName, props.getProperty(key));
+                overrides++;
+            }
+        }
+        log.info("Loaded {} overrides from apolo-config.properties", overrides);
     }
 
     /**
@@ -339,8 +352,8 @@ public final class ApoloConfig {
             return fromProp;
         }
 
-        // Search for English model in models/ directory
-        Path defaultPath = Path.of(DEFAULT_MODELS_DIR, "vosk-model-small-en-us-0.15");
+        // Search for Spanish model in models/ directory
+        Path defaultPath = Path.of(DEFAULT_MODELS_DIR, "vosk-model-small-es-0.42");
         if (Files.isDirectory(defaultPath)) {
             return defaultPath.toString();
         }
@@ -361,7 +374,7 @@ public final class ApoloConfig {
             }
         }
 
-        return DEFAULT_MODELS_DIR + "/vosk-model-small-en-us-0.15";
+        return DEFAULT_MODELS_DIR + "/vosk-model-small-es-0.42";
     }
 
     // --- Getters ---
@@ -388,5 +401,17 @@ public final class ApoloConfig {
 
     public String getWakeWord() {
         return "apolo";
+    }
+
+    public String getMimoApiKey() {
+        return mimoApiKey;
+    }
+
+    public String getMimoApiUrl() {
+        return mimoApiUrl;
+    }
+
+    public String getMimoTtsUrl() {
+        return mimoTtsUrl;
     }
 }
